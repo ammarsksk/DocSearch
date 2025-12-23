@@ -1,10 +1,14 @@
 from uuid import UUID
 
+import asyncio
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..schemas.documents import DocumentCreateResponse, DocumentStatusResponse
 from ..services import storage_s3
 from ..services.ingestion import ingest_document
+from ..db.session import get_session
 
 router = APIRouter()
 
@@ -24,30 +28,30 @@ async def upload_document(file: UploadFile = File(...)) -> DocumentCreateRespons
 
     document = await storage_s3.create_document_and_upload(file)
 
-    # Phase 1: run ingestion synchronously; later move to a worker.
-    await ingest_document(document_id=document.id)
+    # Phase 2: run ingestion asynchronously so large documents don't block the request.
+    # In production this should be a real worker/queue, but for local dev this is enough.
+    from ..db.models import DocumentStatus
+
+    if document.status != DocumentStatus.ready.value:
+        asyncio.create_task(ingest_document(document_id=document.id))
 
     return DocumentCreateResponse(id=document.id)
 
 
-@router.get(
-    "/{document_id}",
-    response_model=DocumentStatusResponse,
-)
-async def get_document_status(document_id: UUID) -> DocumentStatusResponse:
+@router.get("/{document_id}", response_model=DocumentStatusResponse)
+async def get_document_status(
+    document_id: UUID, session: AsyncSession = Depends(get_session)
+) -> DocumentStatusResponse:
     """Return document metadata and ingestion status."""
-    from ..db.session import get_session
     from ..db import models
 
-    async for session in get_session():
-        document = await session.get(models.Document, document_id)
-        if not document:
-            raise HTTPException(status_code=404, detail="Document not found")
+    document = await session.get(models.Document, document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
 
-        return DocumentStatusResponse(
-            id=document.id,
-            filename=document.filename,
-            status=document.status,
-            created_at=document.created_at,
-        )
-
+    return DocumentStatusResponse(
+        id=document.id,
+        filename=document.filename,
+        status=document.status,
+        created_at=document.created_at,
+    )

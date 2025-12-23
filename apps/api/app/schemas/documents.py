@@ -3,8 +3,6 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from ..db.models import DocumentStatus
-
 
 class DocumentCreateResponse(BaseModel):
     id: UUID
@@ -13,6 +11,5 @@ class DocumentCreateResponse(BaseModel):
 class DocumentStatusResponse(BaseModel):
     id: UUID
     filename: str
-    status: DocumentStatus
+    status: str
     created_at: datetime
-

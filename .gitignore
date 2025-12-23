@@ -1,0 +1,34 @@
+*
+
+# Allow gitignore + top-level essentials
+!.gitignore
+!README.md
+!docker-compose.yml
+!.env.example
+
+# Allow infrastructure files
+!infra/
+!infra/**
+
+# Allow application source + config
+!apps/
+!apps/**
+
+# Still keep secrets out, even if under allowed folders
+.env
+.env.*
+apps/api/.env
+
+# Keep typical junk ignored even if under allowed folders
+**/__pycache__/
+**/*.py[cod]
+**/.venv/
+**/venv/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/*.log
+**/.DS_Store
+**/Thumbs.db
+**/.idea/
+**/.vscode/
